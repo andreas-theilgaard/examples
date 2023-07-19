@@ -7,7 +7,7 @@ import re
 import numpy as np
 import torch
 from torch.optim import Adam
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torchvision import datasets
 from torchvision import transforms
 import torch.onnx
@@ -15,6 +15,8 @@ import torch.onnx
 import utils
 from transformer_net import TransformerNet
 from vgg import Vgg16
+from tqdm import tqdm
+import random
 
 
 def check_paths(args):
@@ -36,19 +38,35 @@ def train(args):
     else:
         device = torch.device("cpu")
 
+    random.seed(args.seed) # Set random seed. This ensures reproducibility for the chosen subset of training data.
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
-    transform = transforms.Compose([
+    transform_list = [
         transforms.Resize(args.image_size),
         transforms.CenterCrop(args.image_size),
         transforms.ToTensor(),
         transforms.Lambda(lambda x: x.mul(255))
-    ])
+    ]
+
+    # Define random rotation data processing step
+    RandomRotation = [transforms.RandomRotation(degrees=list(map(int,args.degrees.split(','))),
+                                        interpolation=utils.interpolationmode[args.interpolation],
+                                        expand = args.expand,
+                                        center=args.center if not args.center else list(map(int,args.center.split(','))),
+                                        fill = args.fill)]
+
+    transform_list = RandomRotation + transform_list if args.RandomRotation else transform_list
+    transform = transforms.Compose(transform_list)
+
     train_dataset = datasets.ImageFolder(args.dataset, transform)
+
+    if args.subset_size != 0: # Only when subset size is 0, a subset of the traning data is not used
+        subset_list = utils.random_subset(train_dataset, size_of_subset = args.subset_size) # Get subset_list
+        train_dataset = Subset(train_dataset, subset_list) # Pick the indices from the subset_list and use these as the training data
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size)
 
-    transformer = TransformerNet().to(device)
+    transformer = TransformerNet(args.Res_Block_Activation).to(device)
     optimizer = Adam(transformer.parameters(), args.lr)
     mse_loss = torch.nn.MSELoss()
 
@@ -64,7 +82,7 @@ def train(args):
     features_style = vgg(utils.normalize_batch(style))
     gram_style = [utils.gram_matrix(y) for y in features_style]
 
-    for e in range(args.epochs):
+    for e in tqdm(range(args.epochs)): # added to track training progress
         transformer.train()
         agg_content_loss = 0.
         agg_style_loss = 0.
@@ -139,7 +157,7 @@ def stylize(args):
         output = stylize_onnx(content_image, args)
     else:
         with torch.no_grad():
-            style_model = TransformerNet()
+            style_model = TransformerNet(args.Res_Block_Activation)
             state_dict = torch.load(args.model)
             # remove saved deprecated running_* keys in InstanceNorm from the checkpoint
             for k in list(state_dict.keys()):
@@ -219,6 +237,20 @@ def main():
                                   help="number of images after which the training loss is logged, default is 500")
     train_arg_parser.add_argument("--checkpoint-interval", type=int, default=2000,
                                   help="number of batches after which a checkpoint of the trained model will be created")
+    train_arg_parser.add_argument('--mps', action='store_true', default=False, help='enable macOS GPU training') # Added such that training with Apple's m chips also is possible
+    # Add subset argument
+    train_arg_parser.add_argument("--subset-size", type=int, default=100,
+                                  help="The subset size used for training the model. If all avaviable training data should be utilized then set the value to 0.")
+    # Add arguments for RandomRotation
+    train_arg_parser.add_argument("--RandomRotation", action='store_true')
+    train_arg_parser.add_argument("--degrees", default = "0,120", type=str)
+    train_arg_parser.add_argument("--interpolation", default = 'NEAREST', choices= ['NEAREST', 'BILINEAR'])
+    train_arg_parser.add_argument("--expand", action='store_true')
+    train_arg_parser.add_argument("--center", type=str)
+    train_arg_parser.add_argument("--fill", type=int, default=0)
+    # Add arguments for activation function for residual block of transformer network
+    train_arg_parser.add_argument("--Res-Block-Activation", choices=list(utils.act_funcs.keys()), default='ReLU')
+
 
     eval_arg_parser = subparsers.add_parser("eval", help="parser for evaluation/stylizing arguments")
     eval_arg_parser.add_argument("--content-image", type=str, required=True,
@@ -234,6 +266,8 @@ def main():
     eval_arg_parser.add_argument("--export_onnx", type=str,
                                  help="export ONNX model to a given file")
     eval_arg_parser.add_argument('--mps', action='store_true', default=False, help='enable macOS GPU training')
+    eval_arg_parser.add_argument("--Res-Block-Activation", choices=list(utils.act_funcs.keys()), default='ReLU')
+
 
     args = main_arg_parser.parse_args()
 

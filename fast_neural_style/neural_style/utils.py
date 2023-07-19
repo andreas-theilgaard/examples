@@ -1,6 +1,7 @@
 import torch
 from PIL import Image
-
+import random
+from torchvision.transforms import InterpolationMode
 
 def load_image(filename, size=None, scale=None):
     img = Image.open(filename).convert('RGB')
@@ -32,3 +33,32 @@ def normalize_batch(batch):
     std = batch.new_tensor([0.229, 0.224, 0.225]).view(-1, 1, 1)
     batch = batch.div_(255.0)
     return (batch - mean) / std
+
+def random_subset(train_dataset, size_of_subset : int = 100):
+    """
+    Function for picking a random subset for the 'train_dataset' object
+    Attributes
+    ----------
+        train_dataset:
+            A pytorch dataset object
+        size_of_subset:
+            An integer representing the size of the data subset
+    
+    Returns:
+        A list of size size_of_subset with random valid indices for train_dataset
+    """
+    N = len(train_dataset.samples) # The total number of indices to choose from
+    Subset_list = random.sample(range(0,N),size_of_subset) # Pick size_of_subset random indices in the interval [0;N]
+    return Subset_list
+
+# Dictionary for possible activation functions used in the residual block of the transformer network
+act_funcs = {
+    "ReLU" : torch.nn.ReLU(),
+    "RReLU" : torch.nn.RReLU()
+}
+
+# Dictionary for possible interpolation methods used in the transformation step when loading the data
+interpolationmode = {
+    "NEAREST" : InterpolationMode.NEAREST,
+    "BILINEAR" : InterpolationMode.BILINEAR
+}

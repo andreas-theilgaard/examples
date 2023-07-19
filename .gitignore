@@ -16,6 +16,7 @@ gcn/cora/
 docs/build
 docs/venv
 
+fast_neural_style/images/imagenette-320
 # vi backups
 *~
 
