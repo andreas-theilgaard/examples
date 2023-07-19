@@ -1,3 +1,54 @@
+# Answers
+
+1. First the repo was forked and the working directory was set to `fast_neural_style/` by `cd fast_neural_style`.
+
+2. The following command was used to create `images/output-images/mosaic_soccer_ball_2.jpeg`
+ ```bash
+python3 neural_style/neural_style.py eval --content-image images/content-images/soccer_ball.jpg --model saved_models/mosaic.pth --output-image images/output-images/mosaic_soccer_ball_2.jpeg --cuda 0 --mps
+```
+
+3. The following commands were used to create `images/output-images/mosaic_soccer_ball_3.jpeg`
+
+First the model is trained with 100 random Imagenette-320 images with
+```bash
+python3 neural_style/neural_style.py train --dataset images/imagenette-320/train --style-image images/style-images/mosaic.jpg --save-model-dir saved_models --epochs 10 --subset-size 100 --cuda 0 --mps
+```
+
+Then the model is evaluated using
+```bash
+python3 neural_style/neural_style.py eval --content-image images/content-images/soccer_ball.jpg --model saved_models/mosaic_imagenette_subset.model --output-image images/output-images/mosaic_soccer_ball_3.jpeg --cuda 0 --mps
+```
+
+4. The following commands were used to create `images/output-images/mosaic_soccer_ball_4.jpeg`
+
+First the model is trained with 100 random Imagenette-320 images and random rotation with
+```bash
+python3 neural_style/neural_style.py train --dataset images/imagenette-320/train --style-image images/style-images/mosaic.jpg --save-model-dir saved_models --epochs 10 --subset-size 100 --RandomRotation --degrees 0,120 --cuda 0 --mps
+```
+Notice the RandomRotation is activated with the flag `--RandomRotation`. Further, only `--degrees 0,120` option for random rotation is explicitly set. For `interpolation, expand, center` and `fill` the default parameters are used. However, these parameters can also be set using their respective flags.
+
+The model is evaluated using
+```bash
+python3 neural_style/neural_style.py eval --content-image images/content-images/soccer_ball.jpg --model saved_models/mosaic_imagenette_subset_RandomRotation.model --output-image images/output-images/mosaic_soccer_ball_4.jpeg --cuda 0 --mps
+```
+
+
+5. The following commands were used to create `images/output-images/mosaic_soccer_ball_5.jpeg`
+
+First the model is trained with 100 random Imagenette-320 images and RReLU as the activation function in the residual block for the transformer network with the following command
+
+```bash
+python3 neural_style/neural_style.py train --dataset images/imagenette-320/train --style-image images/style-images/mosaic.jpg --save-model-dir saved_models --epochs 10 --subset-size 100 --Res-Block-Activation RReLU --cuda 0 --mps
+```
+Notice that random rotation is not applied for this model. However, this can easily be done using the `--RandomRotation` flag.
+
+Then the model is evaluated using the following command
+```bash
+python3 neural_style/neural_style.py eval --content-image images/content-images/soccer_ball.jpg --model saved_models/mosaic_imagenette_subset_RReLU.model --output-image images/output-images/mosaic_soccer_ball_5.jpeg --Res-Block-Activation RReLU --cuda 0 --mps
+```
+Notice, we also use the `--Res-Block-Activation RReLU` flag for the evaluation mode such that the trained model architecture and evaluation model architecture are consistent.
+
+
 # fast-neural-style :city_sunrise: :rocket:
 
 This repository contains a pytorch implementation of an algorithm for artistic style transfer. The algorithm can be used to mix the content of an image with the style of another image. For example, here is a photograph of a door arch rendered in the style of a stained glass painting.
